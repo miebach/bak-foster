@@ -1,0 +1,242 @@
+#!/usr/bin/python
+import os
+import re
+import sys
+import datetime
+
+"""
+THE PROGRAM IS DISTRIBUTED IN THE HOPE THAT IT WILL BE USEFUL, 
+BUT WITHOUT ANY WARRANTY. IT IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, 
+EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, 
+THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. 
+THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM IS WITH YOU. 
+SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF ALL NECESSARY 
+SERVICING, REPAIR OR CORRECTION.
+
+IN NO EVENT UNLESS REQUIRED BY APPLICABLE LAW THE AUTHOR WILL BE LIABLE TO 
+YOU FOR DAMAGES, INCLUDING ANY GENERAL, SPECIAL, INCIDENTAL OR CONSEQUENTIAL 
+DAMAGES ARISING OUT OF THE USE OR INABILITY TO USE THE PROGRAM 
+(INCLUDING BUT NOT LIMITED TO LOSS OF DATA OR DATA BEING RENDERED 
+INACCURATE OR LOSSES SUSTAINED BY YOU OR THIRD PARTIES OR A FAILURE OF THE 
+PROGRAM TO OPERATE WITH ANY OTHER PROGRAMS), EVEN IF THE AUTHOR HAS BEEN 
+ADVISED OF THE POSSIBILITY OF SUCH DAMAGES. 
+"""
+
+class File(object):
+    pass
+
+class BakFoster(object):
+
+
+    def __init__(self,dir,pretag,posttag,minsize,continous,daydelta):
+      self.debug_regex = 0
+      self.dir=dir
+      self.cand = {} # possible candidats to erase
+      self.cont = {} # keep the first n backups continously
+      self.dayd = {} # keep the first n backups continously
+      self.toosmall = {} # to small size, ignore
+      self.presize   = len(pretag)
+      self.postsize   = len(posttag)
+      self.minsize   = minsize
+      self.continous = continous
+      if self.continous < 1:
+        self.continous = 1
+      self.daydelta  = daydelta
+      self.get_files(dir,pretag,posttag)
+    
+    def get_files(self,dir,pretag,posttag):
+      allfiles = self.listdir(dir)
+      for fn in allfiles:
+        if fn.startswith(pretag):
+          if fn.endswith(posttag):
+            n = File()
+            n.name = fn
+            n.mid  = self.mid_name(fn)
+            n.size = self.getsize(fn)
+            n.dt = self.parse_dt(n.mid)
+            n.key = self.make_key(n.dt,n.name) # creates a sortable string from date
+            if n.size < self.minsize:
+              self.toosmall[n.key] = n # they key is also in the object
+            else:
+              self.cand[n.key] = n # they key is also in the object
+            
+    def make_key(self,dt,name):
+      return dt.isoformat(' ') + name           
+      
+
+    def find_continous(self):
+      """find and keep the first continous n files and give back the date of the last one"""
+      dk = self.cand.keys()
+      dk.sort() # sort by date...
+      dk.reverse() # .. and reverse so latest comes first
+      i = 0
+      for k in dk:
+        i += 1
+        if i > self.continous:
+          break # get out of the loop
+        # move from cand to continous
+        self.cont[k] = self.cand[k]
+        del self.cand[k]
+        latest = self.cont[k].dt
+      return latest
+        
+    def find_daydelta(self,dt):
+      """keep the files every daydelta days"""
+      dk = self.cand.keys()
+      dk.sort() # sort by date...
+      dk.reverse() # .. and reverse so latest comes first
+      latest = dt
+      for k in dk:
+        # subtracting 2 datetime objects:
+        diff = latest - self.cand[k].dt # the result is of type timedelta
+        if diff.days >= self.daydelta:
+          # move from cand to daydelta
+          self.dayd[k] = self.cand[k]
+          del self.cand[k]
+          latest = self.dayd[k].dt
+        
+
+
+
+
+    def dump_dict(self,dict,dictname):
+      res = ""
+      res += "============================================\n"
+      res += dictname + ":\n"
+      res += "--------------------------------------------\n"       
+      i = 0
+      dk = dict.keys()
+      dk.sort()
+      dk.reverse()
+      for k in dk:
+        f = dict[k]
+        i += 1
+        res += "%s: %s %s\n" % (i,k,f.size)
+      return res
+        
+        
+    def dump(self):
+       res = ""
+       res += self.dump_dict(self.toosmall,"Too small:")           
+       res += self.dump_dict(self.cand,"Candidates:")           
+       res += self.dump_dict(self.cont,"Continous:")           
+       res += self.dump_dict(self.dayd,"DayDelta:")
+       return res           
+      
+    def mid_name(self,fn):
+      """strips the pretag and the posttag from the name"""
+      return fn[self.presize:self.postsize * -1]
+      
+    
+    def parse_dt(self,fn):
+      """extracts a date yyyy-mm-dd and a time hh-mm from a string"""
+      # first try: year with 4 digits 
+      p = re.compile(r'(\d{4})\D?(\d{2})\D?(\d{2})\D?(\d{2})\D?(\d{2})') 
+      s = p.search(fn) # e.g. 'xxx2007-10-02x17h20cc'
+      if s is not None:
+        g = s.groups() # is None or sth like ('2009','12','24','23','59')
+        if self.debug_regex: 
+          print g
+        return datetime.datetime(int(g[0]),int(g[1]),int(g[2]),int(g[3]),int(g[4]))
+      # 2nd try: year with 2 digits 
+      p = re.compile(r'(\d{2})\D?(\d{2})\D?(\d{2})\D?(\d{2})\D?(\d{2})') 
+      s = p.search(fn) # e.g. 'xxx07-10-02x17h20cc'
+      if s is not None:
+        g = s.groups() # is None or sth like ('2009','12','24','23','59')
+        if self.debug_regex: 
+          print g
+        # need to add 2000 to year with 2 digits: 
+        return datetime.datetime(2000+int(g[0]),int(g[1]),int(g[2]),int(g[3]),int(g[4]))
+      return None
+        
+      
+    def test_parse_dt(self):
+      # when the year is 2 digit there must be a seperation between 
+      # year and month at least!
+      self.debug_regex =1
+      d1 = datetime.datetime(2009,2,1,17,40)
+      assert (self.parse_dt("abc-20090201174035.tar.gz")== d1)
+      assert (self.parse_dt("abc-20090201-1740_3433.tar.gz")== d1)
+      assert (self.parse_dt("abc-2009-02-01-17h40.tar.gz")== d1)
+      assert (self.parse_dt("abc-09-02-01-174099.tar.gz")== d1)
+      assert (self.parse_dt("abc-09-02-01_17h40.tar.gz")== d1)
+      
+      
+    def listdir(self,dir):
+      return os.listdir(dir)
+    
+    def getsize(self,fn):
+      return os.path.getsize(os.path.join(self.dir,fn))
+
+
+    def mark_files(self,postfix):
+      """append the postfix to all candidates filenames"""
+      dk = self.cand.keys()
+      dk.sort() # sort by date...
+      dk.reverse() # .. and reverse so latest comes first
+      res = ""
+      for k in dk:
+        fn = self.cand[k].name
+        pfn = os.path.join(self.dir,fn)
+        fnnew = fn + postfix
+        pfnnew = os.path.join(self.dir,fnnew)
+        os.rename(pfn,pfnnew)
+        res += "mv %s %s\n" % (pfn,pfnnew)
+      return res
+        
+    def remove_files(self):
+      """remove the left candidates"""
+      dk = self.cand.keys()
+      dk.sort() # sort by date...
+      dk.reverse() # .. and reverse so latest comes first
+      res = ""
+      for k in dk:
+        fn = self.cand[k].name
+        pfn = os.path.join(self.dir,fn)
+        os.remove(pfn)
+        res += "rm %s \n" % pfn
+      return res
+        
+
+
+
+def run_tests():
+  files = Files("","","")
+  files.test_parse_dt()
+
+
+def run():
+  """the main function"""
+  parcount = len(sys.argv) - 1
+  if  parcount < 6:
+    print "Please call with at least 6 parameters. See README. Terminating."
+    sys.exit()
+  dir = sys.argv[1]
+  pretag = sys.argv[2]
+  posttag = sys.argv[3]
+  minsize_s = sys.argv[4]
+  continous_s = sys.argv[5]
+  daydelta_s = sys.argv[6]
+  if  parcount > 6:
+    action = sys.argv[7]
+  else:
+    action = "dry-run"
+  bf = BakFoster(dir=dir,pretag=pretag,posttag=posttag,
+             minsize=int(minsize_s),continous=int(continous_s),
+             daydelta=int(daydelta_s))
+  dt_last_continous = bf.find_continous()
+  bf.find_daydelta(dt_last_continous)
+  print "action:",action
+  if action == "dry-run":
+    print bf.dump()
+  elif action == "mark":
+    rename_log = bf.mark_files(".rm")
+    print rename_log
+  elif action == "remove":
+    remove_log = bf.remove_files()
+    print remove_log
+  
+  
+
+run()
+ 

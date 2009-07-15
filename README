@@ -1,0 +1,86 @@
+bak-foster is a simple python script that can be called from cron.
+it should work on windows and unix.
+
+it takes a bunch of backup files from a series and decides which backups to keep
+and which ones to trash.
+
+there are 3 operation modes, depending on the parameter action.
+
+the idea is that some backup strategies, especially when copied from remote locations, 
+produce ongoing daily backup files but you might want to keep only the latest and
+in addition some but not all of the older files.
+
+to be called e.g. daily from the command line:
+
+    bak-foster dir pretag posttag minsize continous daydelta action
+
+the meaning of the parameters:
+
+dir: the directory that contains the backups
+
+pretag, posttag (string): is necessary to identify the backups. filenames must start with pretag and end with posttag. posttag also must inlude the filename extension
+
+minsize (integer) : minimal size in bytes. files that are smaller are ignored
+
+continous (integer) : number of contonous latest backup files that will be kept
+
+daydelta (integer): number of days between all older backups that will be kept
+
+action (string): can be "dry-run" or "mark" or "remove". dry-run shows info and 
+mark renames (adds ".rm" to the filename). remove removes (sic!)
+
+example:
+
+if a directory contains backup files named like this:
+project1_20090101_17h50.tar.gz
+project1_20090102_17h50.tar.gz
+project1_20090103_17h50.tar.gz
+project1_20090108_17h50.tar.gz
+project1_20090109_17h50.tar.gz
+project1_20090110_17h50.tar.gz
+project1_20090111_17h50.tar.gz
+project1_20090112_17h50.tar.gz
+project1_20090113_17h50.tar.gz
+project1_20090114_17h50.tar.gz
+project1_20090115_17h50.tar.gz
+project1_20090116_17h50.tar.gz
+project1_20090117_17h50.tar.gz
+project1_20090118_17h50.tar.gz
+project1_20090119_17h50.tar.gz
+project1_20090120_17h50.tar.gz
+project1_20090121_17h50.tar.gz
+project1_20090122_17h50.tar.gz
+someother.tar.gz
+
+and you call bak-foster like this:
+
+bak-foster project1_ .tar.gz 100000 3 5
+
+1) someother.tar.gz will be ignored, because the pretag does not match
+2) the files from day 20,21 and 22 will be kept (the latest 3)
+3) the files 15, 10 and 03 will be kept (daydelta = 5, ever 5 days we keep a backup,
+but days 04 and 05 are not present, so we keep 03)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

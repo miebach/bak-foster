@@ -1,0 +1,3 @@
+#!/bin/sh
+./bakfoster /mnt/rom/local/bak/pc10 onlytesting_ .rar 4000 3 5 remove
+
