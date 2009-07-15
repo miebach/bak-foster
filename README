@@ -1,14 +1,14 @@
 bak-foster is a simple python script that can be called from cron.
-it should work on windows and unix.
+it is designed for unix systems and was not tested on windows.
 
-it takes a bunch of backup files from a series and decides which backups to keep
+it looks at a bunch of backup files from a series and decides which backups to keep
 and which ones to trash.
 
-there are 3 operation modes, depending on the parameter action.
+there are 3 operation modes, depending on the parameter "action", see below.
 
 the idea is that some backup strategies, especially when copied from remote locations, 
 produce ongoing daily backup files but you might want to keep only the latest and
-in addition some but not all of the older files.
+in addition some but not all of the older files. 
 
 to be called e.g. daily from the command line:
 
@@ -18,11 +18,16 @@ the meaning of the parameters:
 
 dir: the directory that contains the backups
 
-pretag, posttag (string): is necessary to identify the backups. filenames must start with pretag and end with posttag. posttag also must inlude the filename extension
+pretag, posttag (string): is necessary to identify the backups. filenames must 
+start with pretag and end with posttag. posttag also must inlude the filename 
+extension. that way it is possible to have different independent backup series in
+the same directory, if they only have a different pretag or posttag.
+
+the parameters are:
 
 minsize (integer) : minimal size in bytes. files that are smaller are ignored
 
-continous (integer) : number of contonous latest backup files that will be kept
+continous (integer) : number of continous latest backup files that will be kept
 
 daydelta (integer): number of days between all older backups that will be kept
 
@@ -43,6 +48,7 @@ project1_20090112_17h50.tar.gz
 project1_20090113_17h50.tar.gz
 project1_20090114_17h50.tar.gz
 project1_20090115_17h50.tar.gz
+someother.tar.gz
 project1_20090116_17h50.tar.gz
 project1_20090117_17h50.tar.gz
 project1_20090118_17h50.tar.gz
@@ -50,16 +56,15 @@ project1_20090119_17h50.tar.gz
 project1_20090120_17h50.tar.gz
 project1_20090121_17h50.tar.gz
 project1_20090122_17h50.tar.gz
-someother.tar.gz
 
 and you call bak-foster like this:
 
-bak-foster project1_ .tar.gz 100000 3 5
+bak-foster project1_ .tar.gz 100000 3 5 mark
 
 1) someother.tar.gz will be ignored, because the pretag does not match
-2) the files from day 20,21 and 22 will be kept (the latest 3)
-3) the files 15, 10 and 03 will be kept (daydelta = 5, ever 5 days we keep a backup,
-but days 04 and 05 are not present, so we keep 03)
+2) the files from day 20,21 and 22 will be kept (the latest 3, continous)
+3) the files 15, 10 and 03 will be kept (daydelta = 5, every 5 days we keep a 
+backup, but days 04 and 05 are not present, so we keep 03)
 
 
 
